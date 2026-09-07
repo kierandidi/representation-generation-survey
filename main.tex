@@ -198,7 +198,9 @@ If it is active, the generator can reshape the encoder. That can improve modelab
 
 The VAE formalized amortized latent-variable learning \citep{kingma2014vae}; VQ-VAE supplied a learned discrete tokenizer \citep{oord2017vqvae}. Score-based latent models showed that a learned diffusion prior could be integrated with a hierarchical autoencoder \citep{vahdat2021lsgm}. Latent diffusion then established the modular engineering recipe: train a perceptual compressor, freeze it, and learn a denoiser in the compressed space \citep{rombach2022ldm}. DiT made the latent denoiser a scalable Transformer \citep{peebles2023dit}.
 
-In parallel, self-supervised visual encoders developed increasingly transferable semantic spaces. Their features were usually evaluated by linear probes, retrieval, segmentation, or robustness, not by whether pixels could be reconstructed or whether a generative prior could model their full joint distribution. The convergence began when generative models used those features as internal targets. \method{REPA} aligned DiT hidden states to frozen semantic features and reported substantially faster optimization \citep{yu2024repa}. Follow-up work varied targets, schedules, and coupling, while another branch moved the alignment into the tokenizer. A third branch replaced the conventional VAE encoder with a VFM. The 2026 wave made the final step explicit: allow representation, prior, and decoder to shape one another.
+In parallel, self-supervised visual encoders developed increasingly transferable semantic spaces. Their features were usually evaluated by linear probes, retrieval, segmentation, or robustness, not by whether pixels could be reconstructed or whether a generative prior could model their full joint distribution. An important reverse-direction precedent was \method{DDAE}: rather than importing a representation teacher into a generator, it showed that intermediate features learned by unconditional diffusion pretraining already support linear probing and transfer \citep{xiang2023ddae}. Contemporaneous work likewise studied diffusion models as masked autoencoders or representation learners \citep{wei2023dmae,yang2023drl}. These results did not yet solve the latent-interface problem, but they established that generation and representation learning need not be separate networks.
+
+The convergence accelerated when generative models used external self-supervised features as internal targets. \method{REPA} aligned DiT hidden states to frozen semantic features and reported substantially faster optimization \citep{yu2024repa}. Follow-up work varied targets, schedules, and coupling, while another branch moved the alignment into the tokenizer. A third branch replaced the conventional VAE encoder with a VFM. The 2026 wave made the final step explicit: allow representation, prior, and decoder to shape one another.
 
 \begin{figure}[htbp]
   \centering
@@ -459,7 +461,9 @@ Latent dimension alone is not rate. A continuous \(64\times64\times1024\) tensor
 Whitening, channel scale, token outliers, covariance condition number, and tail behavior affect optimization. A generator can fail on a perfectly reconstructive latent simply because the aggregate distribution is ill-conditioned. Conversely, a low-dimensional smooth code may be easy to model while discarding details the decoder cannot recover.
 
 \paragraph{5. Geometry and spectrum.}
-If features concentrate on a sphere or another manifold, Euclidean interpolation can traverse low-density interiors. Hyperspherical methods such as \method{Sphere Encoder} and \method{dRAE} make the geometry explicit \citep{yue2026sphere,ma2026drae}. Frequency organization is another view. \method{Spectrum Matching} proposes that a diffusion-friendly encoder should expose a suitably flattened power spectrum and that decoder training should pair image- and latent-frequency perturbations \citep{ning2026spectrum}.
+If features concentrate on a sphere or another manifold, Euclidean interpolation can traverse low-density interiors. Hyperspherical methods such as \method{Sphere Encoder} and \method{dRAE} make the geometry explicit \citep{yue2026sphere,ma2026drae}. \method{RJF} sharpens this into a path-design claim for pretrained representation latents: projecting Gaussian noise onto the feature sphere repairs the endpoints, but a linear interpolant still follows an off-manifold chord; SLERP instead follows a geodesic and its velocity remains tangent to the sphere \citep{kumar2026rjf}. In the paper's controlled protocol, endpoint projection alone improved FID only marginally, whereas the full geometry-aware method improved much more. This is evidence that geometry can explain failures otherwise attributed to insufficient Transformer width; it is not proof that capacity never matters, because architecture, objective, and solver are changed together in the full comparison. Appendix~\ref{app:sphere} gives the derivation.
+
+Frequency organization is another view. \method{Spectrum Matching} proposes that a diffusion-friendly encoder should expose a suitably flattened power spectrum and that decoder training should pair image- and latent-frequency perturbations \citep{ning2026spectrum}.
 
 The exact foundation is Parseval's identity. For an orthonormal transform \(F\),
 \begin{align}
@@ -509,7 +513,7 @@ Robustness & drifted-latent recon, Jacobian gain & \(D(E(x))\) is in-distributio
 
 \subsection{Sphere Encoder and iterative refinement}
 
-\method{Sphere Encoder} learns a conditionally uniform hyperspherical latent and samples directly from the sphere \citep{yue2026sphere}. It can generate in one decoder pass or refine by repeatedly encoding and decoding. This is not an RAE: the code is not inherited from a pretrained semantic encoder. It is also not a diffusion prior: the intent is to make a simple uniform prior directly usable. Its recurrence is best seen as learned projection or refinement around an autoencoder.
+\method{Sphere Encoder} learns an encoder and decoder whose aggregate code is conditionally uniform on a hypersphere, so a normalized Gaussian sample is already a valid code \citep{yue2026sphere}. It can generate in one decoder pass. Its optional few-step procedure then re-encodes the decoded image, adds method-specific tangent-space noise during spherification, and decodes again. This is not an RAE: the code is learned for generation rather than inherited from a pretrained semantic encoder. It is also not a diffusion prior, and the refinement loop is not a deep equilibrium model: the method executes a chosen finite number of encoder--decoder passes and does not define or implicitly differentiate a solved fixed point. The closest description is recurrent learned projection toward the image manifold.
 
 \subsection{Latent Forcing: order the information reveal}
 
@@ -752,6 +756,119 @@ If a binary frequency mask \(M\) is applied consistently, the loss becomes
 \]
 This exactly justifies frequency-resolved reconstruction. It does not identify the optimal latent power spectral density. That step requires assumptions about the data, model class, noise schedule, and optimization, or empirical validation.
 
+\subsection{Why Euclidean chords leave a hypersphere}
+\label{app:sphere}
+
+The second reading-group deck asks whether a representation generator fails because the denoiser is too narrow or because its probability path has the wrong geometry. The two hypotheses are not mutually exclusive. The following calculation isolates the geometric part used by \method{RJF} \citep{kumar2026rjf}.
+
+Let \(x,\epsilon\in\mathbb{S}^{d-1}\) be unit vectors and define their angle by
+\[
+\enc{x^\top\epsilon}=\cos\Omega,
+\qquad 0<\Omega<\pi.
+\]
+Standard conditional flow matching uses the Euclidean chord \(z_t=(1-t)x+t\epsilon\). Its squared radius is
+\begin{align}
+\|z_t\|_2^2
+&=\big((1-t)x+t\epsilon\big)^\top
+   \big((1-t)x+t\epsilon\big)
+&&\text{\color{softgray}{(definition of the norm)}}\\
+&=(1-t)^2\|x\|^2+t^2\|\epsilon\|^2
+  +2t(1-t)x^\top\epsilon
+&&\text{\color{softgray}{(bilinearity)}}\\
+&=(1-t)^2+t^2+2t(1-t)\cos\Omega
+&&\text{\color{softgray}{(unit endpoints and angle)}}.
+\label{eq:chord-radius}
+\end{align}
+At the midpoint,
+\begin{align}
+\|z_{1/2}\|_2^2
+&=\frac12(1+\cos\Omega)
+&&\text{\color{softgray}{(substitute \(t=1/2\))}}\\
+&\approx\frac12,
+\qquad
+\|z_{1/2}\|_2\approx\frac{1}{\sqrt2}
+&&\text{\color{softgray}{(near-orthogonality in high dimension)}}.
+\end{align}
+The approximation uses concentration: independently oriented high-dimensional unit vectors typically have \(x^\top\epsilon\approx0\), hence \(\Omega\approx\pi/2\). For a sphere of radius \(R=\sqrt d\), the same calculation gives a midpoint radius near \(\sqrt{d/2}\), even though both endpoints have radius \(\sqrt d\). Normalizing only the noise endpoint therefore does not repair the intervening path.
+
+Spherical linear interpolation replaces the chord by
+\begin{equation}
+z_t^{\mathrm{slerp}}
+=a_t x+b_t\epsilon,
+\quad
+a_t=\frac{\sin((1-t)\Omega)}{\sin\Omega},
+\quad
+b_t=\frac{\sin(t\Omega)}{\sin\Omega}.
+\label{eq:slerp}
+\end{equation}
+Set \(A=(1-t)\Omega\) and \(B=t\Omega\), so \(A+B=\Omega\). Then
+\begin{align}
+\|z_t^{\mathrm{slerp}}\|^2
+&=a_t^2+b_t^2+2a_tb_t\cos\Omega
+&&\text{\color{softgray}{(same bilinear expansion)}}\\
+&=\frac{\sin^2A+\sin^2B+2\sin A\sin B\cos(A+B)}
+        {\sin^2(A+B)}
+&&\text{\color{softgray}{(substitute \(a_t,b_t,\Omega=A+B\))}}\\
+&=1
+&&\text{\color{softgray}{(trigonometric identity)}}.
+\end{align}
+Thus every intermediate point remains on the unit sphere. On a 2D unit circle with \(x=(1,0)\), \(\epsilon=(0,1)\), and \(\Omega=\pi/2\), the Euclidean midpoint is \((1/2,1/2)\) with radius \(1/\sqrt2\), whereas the SLERP midpoint is \((1/\sqrt2,1/\sqrt2)\) with radius one. The distinction is chord versus arc, not merely Gaussian versus normalized noise.
+
+Differentiating Equation~\eqref{eq:slerp} gives the target tangent velocity
+\begin{align}
+u_t^{\mathcal M}
+=\dot z_t^{\mathrm{slerp}}
+&=\frac{\Omega}{\sin\Omega}
+\left[
+\cos(t\Omega)\epsilon
+-\cos((1-t)\Omega)x
+\right]
+&&\text{\color{softgray}{(chain rule)}}.
+\label{eq:slerp-velocity}
+\end{align}
+Because the path has constant norm,
+\begin{align}
+0
+&=\frac{d}{dt}\|z_t^{\mathrm{slerp}}\|^2
+=2(z_t^{\mathrm{slerp}})^\top\dot z_t^{\mathrm{slerp}}
+&&\text{\color{softgray}{(differentiate the invariant)}}\\
+\Longrightarrow\quad
+(z_t^{\mathrm{slerp}})^\top u_t^{\mathcal M}&=0
+&&\text{\color{softgray}{(tangent-space condition)}}.
+\end{align}
+A network prediction \(v_\theta\) can be made tangent by removing its radial component,
+\[
+\prior{v_\theta^{\mathrm{tan}}}
+=v_\theta-(v_\theta^\top z_t)z_t.
+\]
+At sampling time, an Euler step would leave the sphere. The exponential map instead rotates along a great circle:
+\[
+z_{t+\Delta t}
+=\cos(\|v\|\Delta t)z_t
++\sin(\|v\|\Delta t)\frac{v}{\|v\|},
+\qquad v\perp z_t.
+\]
+
+\method{RJF} additionally asks how an instantaneous transverse velocity error \(w\) affects a later endpoint. For a sphere of radius \(R\), sectional curvature is \(K=1/R^2\). A Jacobi field with \(J(0)=0\) and \(D_\tau J(0)=w\) has endpoint magnitude, for remaining arc length \(L=R(1-t)\Omega\),
+\begin{align}
+\|J(1)\|
+&=\|w\|\frac{\sin(\sqrt K L)}{\sqrt K}
+&&\text{\color{softgray}{(Jacobi equation on constant curvature)}}\\
+&=\|w\|L
+\frac{\sin((1-t)\Omega)}{(1-t)\Omega}
+&&\text{\color{softgray}{(substitute \(K=1/R^2\), \(L=R(1-t)\Omega\))}}.
+\end{align}
+Relative to flat-space propagation \(\|w\|L\), the differential of the exponential map scales transverse error by \(\operatorname{sinc}((1-t)\Omega)\). Squaring the endpoint error yields the method's weight
+\begin{equation}
+\teacher{\lambda(t,\Omega)}
+=\operatorname{sinc}^2((1-t)\Omega),
+\qquad
+\mathcal L_{\mathrm{RJF}}
+=\E\!\left[\lambda(t,\Omega)
+\|v_\theta^{\mathrm{tan}}-u_t^{\mathcal M}\|^2\right].
+\end{equation}
+This weighting is specific to the paper's sphere, endpoint, and time convention; it is not a universal consequence of using SLERP. The exact facts are the chord-radius calculation, norm preservation, and tangency. The claim that these changes remove the practical need for width scaling is empirical and should be tested under matched architectures and compute.
+
 \subsection{Decoder robustness as a directional problem}
 
 For prior sample error \(\delta\), first-order propagation gives
@@ -839,8 +956,11 @@ Intervention: compact bottleneck on frozen VFM features. Coupling: staged. Disti
 \paragraph{Spectrum Matching \citep{ning2026spectrum}.}
 Intervention: encoder latent spectrum and decoder frequency training. Coupling: tokenizer-level. Distinctive control: encoding spectrum matching, decoding spectrum matching, and a Difference-of-Gaussians alignment target. Caveat: the algebraic decomposition is exact; the proposed preferred spectrum is empirical.
 
+\paragraph{RJF \citep{kumar2026rjf}.}
+Intervention: geometry-aware flow over normalized pretrained features. Coupling: frozen representation encoder plus a learned Riemannian latent prior. Distinctive control: spherical endpoint noise, SLERP paths, tangent velocity prediction, exponential-map integration, and Jacobi weighting. Caveat: the chord calculation is exact, but the claim that geometry rather than width is the dominant bottleneck rests on the paper's experimental protocol.
+
 \paragraph{Sphere Encoder \citep{yue2026sphere}.}
-Intervention: learned hyperspherical code with a simple uniform prior. Coupling: learned generative autoencoder. Distinctive control: conditional uniformity and optional iterative refinement. Caveat: neither a pretrained-feature RAE nor a diffusion prior.
+Intervention: learned hyperspherical code with a simple uniform prior. Coupling: learned generative autoencoder. Distinctive control: conditional uniformity, direct decoding, and optional finite encoder--decoder refinement with tangent-space noise. Caveat: neither a pretrained-feature RAE, a diffusion prior, nor an equilibrium model.
 
 \paragraph{Latent Forcing \citep{baade2026latentforcing}.}
 Intervention: an auxiliary semantic trajectory in pixel diffusion. Coupling: joint dual-track denoising with separately scheduled times. Distinctive control: semantics resolve before pixels. Caveat: no learned tokenizer is implied.
@@ -873,11 +993,11 @@ A 60-minute discussion can be organized around five questions:
   \item \textbf{10 min: What is the interface?} Derive Equations~\eqref{eq:elbo} and \eqref{eq:rate}; separate distortion, rate, and aggregate prior mismatch.
   \item \textbf{12 min: Where does representation enter?} Use Figure~\ref{fig:taxonomy} to contrast denoiser alignment, tokenizer shaping, RAEs, and native systems.
   \item \textbf{15 min: What does end-to-end mean?} Trace Figure~\ref{fig:gradients} and Table~\ref{tab:joint}; ask which gradient each stabilizer blocks.
-  \item \textbf{13 min: What makes a latent modelable?} Debate whether rate, geometry, spectrum, or decoder robustness explains each result.
+  \item \textbf{13 min: What makes a latent modelable?} Derive chord versus SLERP using Appendix~\ref{app:sphere}, then debate whether rate, geometry, spectrum, decoder robustness, or model capacity explains each result.
   \item \textbf{10 min: Does the analogy transfer?} Compare image latents with language and molecular structures, then identify broken invariances.
 \end{enumerate}
 
 \paragraph{Suggested core reading.}
-Read REPA \citep{yu2024repa} for auxiliary alignment, RAE \citep{zheng2025rae} for pretrained-feature latents, and either UL \citep{heek2026ul} or GenFirst \citep{zheng2026genfirst} for joint latent learning. Add Spectrum Matching \citep{ning2026spectrum} for diagnostics and Self-Flow \citep{chefer2026selfflow} for native self-supervision. UNITE \citep{duggal2026unite} is the best bridge to non-image domains in this set.
+Read REPA \citep{yu2024repa} for auxiliary alignment, RAE \citep{zheng2025rae} for pretrained-feature latents, and either UL \citep{heek2026ul} or GenFirst \citep{zheng2026genfirst} for joint latent learning. Add RJF \citep{kumar2026rjf} for the geometry-versus-capacity debate, Spectrum Matching \citep{ning2026spectrum} for diagnostics, and Self-Flow \citep{chefer2026selfflow} for native self-supervision. DDAE \citep{xiang2023ddae} is a useful historical counterpoint: it asks what representation is already inside a diffusion model. UNITE \citep{duggal2026unite} is the best bridge to non-image domains in this set.
 
 \end{document}
