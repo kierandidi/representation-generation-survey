@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you use this survey, please cite it as follows."
+title: "Representations for Generation: A Survey of the Convergence of Visual Representation Learning and Generative Modeling"
+type: article
+authors:
+  - family-names: Didi
+    given-names: Kieran
+    affiliation: NVIDIA
+    email: kieran.didi@gmail.com
+date-released: 2026-09-07
+license: CC-BY-4.0
+repository-code: "https://github.com/kierandidi/representation-generation-survey"
+url: "https://github.com/kierandidi/representation-generation-survey"
+
