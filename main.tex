@@ -5,6 +5,8 @@
 \usepackage[T1]{fontenc}
 \usepackage{microtype}
 \usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage[section]{placeins}
 \usepackage{booktabs}
 \usepackage{tabularx}
 \usepackage{array}
@@ -102,6 +104,13 @@ where the inequality is Jensen's. The color code will be used throughout: \enc{b
 
 Equation~\eqref{eq:elbo} exposes the classic trade-off but hides two practical facts. First, perceptual and adversarial reconstruction losses need not correspond to a normalized likelihood. Second, a simple analytic prior such as \(\mathcal{N}(0,I)\) can be replaced by a learned diffusion prior. The resulting system can be trained jointly, in stages, or with selected stop-gradients. These choices change the optimization problem even when the forward graph looks identical.
 
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.70\linewidth]{figures/excalidraw-originals/ldm_diagram.png}
+  \caption{The modular latent-diffusion recipe: train the autoencoder and latent prior in separate stages. Author-created Excalidraw diagram based on the latent diffusion architecture \citep{rombach2022ldm}.}
+  \label{fig:ldm-diagram}
+\end{figure}
+
 \subsection{Diffusion and flow objectives}
 
 In a variance-preserving diffusion parameterization \citep{ho2020ddpm,song2021sde},
@@ -191,6 +200,24 @@ The VAE formalized amortized latent-variable learning \citep{kingma2014vae}; VQ-
 
 In parallel, self-supervised visual encoders developed increasingly transferable semantic spaces. Their features were usually evaluated by linear probes, retrieval, segmentation, or robustness, not by whether pixels could be reconstructed or whether a generative prior could model their full joint distribution. The convergence began when generative models used those features as internal targets. \method{REPA} aligned DiT hidden states to frozen semantic features and reported substantially faster optimization \citep{yu2024repa}. Follow-up work varied targets, schedules, and coupling, while another branch moved the alignment into the tokenizer. A third branch replaced the conventional VAE encoder with a VFM. The 2026 wave made the final step explicit: allow representation, prior, and decoder to shape one another.
 
+\begin{figure}[htbp]
+  \centering
+  \begin{subfigure}{0.98\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/excalidraw-originals/overview_figure.png}
+    \caption{The original post's four-phase storyline: from unaligned latent generation to joint/native representation learning.}
+  \end{subfigure}
+
+  \vspace{0.8em}
+  \begin{subfigure}{0.88\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/excalidraw-originals/timeline.png}
+    \caption{A chronological snapshot of representation learning, latent generation, and representations-for-generation through the first RAE wave.}
+  \end{subfigure}
+  \caption{Two complementary views retained from the accompanying article. The phase view is a teaching narrative; the timeline records precedent. Neither replaces the mechanism-first taxonomy in Figure~\ref{fig:taxonomy}. Author-created Excalidraw diagrams.}
+  \label{fig:history-story}
+\end{figure}
+
 \subsection{The taxonomy}
 
 Figure~\ref{fig:taxonomy} separates two questions.
@@ -239,6 +266,29 @@ Permanent alignment can also become a liability. \method{HASTE} reports that tur
 \paragraph{Practical recipe.}
 Normalize target and predicted features, isolate the alignment head from the output head, and report whether the teacher operates on clean images, decoded latents, or augmented views. Log the cosine loss by diffusion time. If alignment helps only at high noise or only early in training, a scheduled objective is more faithful than an always-on penalty. Evaluate generation after removing the head to verify that the claimed gain is carried by the denoiser rather than by an inference-time crutch.
 
+\begin{figure}[htbp]
+  \centering
+  \begin{subfigure}[t]{0.47\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/excalidraw-originals/LDM_to_REPA.png}
+    \caption{REPA adds a removable VFM-alignment target to the denoiser.}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.44\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/excalidraw-originals/REPA_to_REG.png}
+    \caption{REG feeds representation-derived information more deeply into generation.}
+  \end{subfigure}
+
+  \vspace{0.8em}
+  \begin{subfigure}{0.92\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/excalidraw-originals/REPA_to_HASTE.png}
+    \caption{HASTE turns alignment off after an early phase, separating feature acquisition from late denoising refinement.}
+  \end{subfigure}
+  \caption{The Phase-1 alignment lineage: REPA \citep{yu2024repa}, REG \citep{wu2025reg}, and HASTE \citep{wang2025haste}. The forward graph changes less than the duration and role of the representation signal. Author-created Excalidraw diagrams; the HASTE panel includes small adapted result panels from the cited work, which are excluded from this paper's CC BY license.}
+  \label{fig:alignment-lineage}
+\end{figure}
+
 \section{Shaping the Tokenizer and Adopting Pretrained Features}
 \label{sec:tokenizers}
 
@@ -246,11 +296,36 @@ Normalize target and predicted features, isolate the alignment head from the out
 
 Conventional perceptual autoencoders already borrow representation losses through LPIPS-like feature distances, but recent methods place semantic organization at the center. \method{REPA-E} allows a representation objective to update the VAE encoder while stopping the diffusion loss from flowing into that encoder \citep{leng2025repae}. Thus it is end-to-end in scheduling and system assembly, not in the strongest gradient-sharing sense. \method{AlignTok} adapts a VFM toward a compact tokenizer while trying to preserve useful semantic structure \citep{chen2025aligntok}. \method{PS-VAE} argues that both semantics and reconstruction are needed for text-to-image generation and editing \citep{zhang2025psvae}. Work on autoencoder diffusability likewise shows that reconstruction FID can improve while the latent distribution becomes harder to model \citep{skorokhodov2025diffusability}.
 
+\method{VA-VAE} makes the reconstruction--generation tension explicit by aligning the learned VAE code to a frozen vision foundation model while retaining pixel, perceptual, adversarial, and KL objectives \citep{yao2025vavae}. This is still a learned compressor: the VFM is a target, not the inference-time encoder. A related staged family starts from VFM features and progressively adapts an adapter and decoder. \method{AlignTok}'s three stages---latent alignment, perceptual alignment, and decoder refinement---separate semantic preservation from fine-detail recovery rather than asking one joint loss to solve both at once \citep{chen2025aligntok}.
+
 The optimization conflict is easy to state. Suppose a nuisance variable \(n\) affects pixels but not category. A representation objective may reward
 \[
 \enc{I(z;y)\ \text{large}},\qquad \enc{I(z;n)\ \text{small}},
 \]
 whereas an invertible decoder needs enough information about \(n\) to reconstruct \(x\). A practical tokenizer can allocate low-frequency or semantic information to an aligned subspace and residual detail to another, but this is an architectural compromise rather than a proof that semantics and fidelity are naturally identical.
+
+\begin{figure}[htbp]
+  \centering
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/excalidraw-originals/LDM_to_VAVAE.png}
+    \caption{VA-VAE moves VFM alignment from denoiser features into tokenizer training.}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.43\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/excalidraw-originals/REPA_to_REPAE.png}
+    \caption{REPA-E jointly schedules representation, autoencoding, and denoising objectives while routing gradients.}
+  \end{subfigure}
+
+  \vspace{0.8em}
+  \begin{subfigure}{0.94\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/excalidraw-originals/VFMVAE_to_3stagealigner.png}
+    \caption{A staged alternative: latent alignment, perceptual adaptation, then decoder refinement.}
+  \end{subfigure}
+  \caption{Ways to shape the tokenizer with representations: VA-VAE \citep{yao2025vavae}, REPA-E \citep{leng2025repae}, and the three-stage AlignTok recipe \citep{chen2025aligntok}. These systems can look similar at inference while optimizing different gradient graphs. Author-created Excalidraw diagrams.}
+  \label{fig:tokenizer-alignment}
+\end{figure}
 
 \subsection{Representation autoencoders}
 
@@ -263,7 +338,44 @@ The promise is compelling: replace a low-level VAE code with a semantically orga
 
 The original RAE work couples a frozen pretrained encoder with a learned pixel decoder and adapts the generative architecture to the resulting wide latent \citep{zheng2025rae}. Scaling studies show that conclusions depend on DiT width and encoder dimension \citep{tong2026scalerae}. \method{RAEv2} aggregates several encoder layers, compares 27 encoders, and combines the latent with internal representation guidance; its main lesson is that RAE and REPA are complementary, not mutually exclusive \citep{singh2026raev2}. \method{LV-RAE} restores low-level information and explicitly trains decoder robustness around the feature manifold \citep{liu2026lvrae}.
 
+Two intermediate designs explain why ``replace the VAE'' is not a single operation. \method{VFM-VAE} merges several frozen VFM layers, compresses them through a regularized latent, and reconstructs progressively at multiple scales \citep{bi2025vfmvae}. \method{SVG} instead combines a frozen semantic feature with a learned residual branch for details that the VFM discarded \citep{shi2025svg}. RAE removes both the additional learned semantic alignment and the mandatory residual encoder: a frozen pretrained representation is the code, and the burden shifts to the decoder and prior.
+
+\begin{figure}[htbp]
+  \centering
+  \begin{subfigure}[t]{0.46\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/excalidraw-originals/VAVAE_to_VFMVAE.png}
+    \caption{VFM-VAE aggregates several frozen VFM layers into a compact regularized code.}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.49\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/excalidraw-originals/VAVAE_to_SVG.png}
+    \caption{SVG preserves a frozen semantic branch and learns a residual detail branch.}
+  \end{subfigure}
+
+  \vspace{0.8em}
+  \begin{subfigure}[t]{0.46\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/excalidraw-originals/VAVAE_to_RAE.png}
+    \caption{RAE uses the pretrained representation directly and learns the inverse decoder.}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.49\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/excalidraw-originals/SVG_to_RAE.png}
+    \caption{From the hybrid SVG interface to the simpler but much wider RAE interface.}
+  \end{subfigure}
+  \caption{The Phase-3 design progression from aligned learned codes to pretrained-feature latents \citep{yao2025vavae,bi2025vfmvae,shi2025svg,zheng2025rae}. These are intervention-point comparisons, not claims that every later method strictly subsumes every earlier one. Author-created Excalidraw diagrams.}
+  \label{fig:rae-progression}
+\end{figure}
+
 \method{FAE} is a useful boundary case. It keeps the VFM frozen but compresses its patch features using one self-attention layer plus a projection. A six-layer feature decoder reconstructs the original VFM feature field using feature MSE and a small KL term; a separate pixel decoder is trained on noisy original features and then refined on reconstructed features \citep{gao2026fae}. Only after this staged adaptation is a generative prior learned. It is therefore neither one projection and done nor a fully joint generator. Its claim is that a very small trainable bottleneck can preserve useful VFM geometry while restoring a conventional, compact generative interface.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.95\textwidth]{figures/excalidraw-originals/RAE_to_FAE.png}
+  \caption{FAE compresses frozen VFM features through a shallow trainable adapter, reconstructs the original feature field with a deeper feature decoder, and separately trains a pixel decoder before fitting the latent prior \citep{gao2026fae}. The diagram makes clear why ``one layer'' describes the feature adapter, not the whole system. Author-created Excalidraw diagram.}
+  \label{fig:rae-to-fae}
+\end{figure}
 
 \paragraph{Discrete and spherical variants.}
 \method{IDEAL} aligns discrete codes with shallow and deep VFM features \citep{chen2026ideal}; \method{dRAE} uses hyperspherical codes to reduce sensitivity to feature magnitude \citep{ma2026drae}. \method{RAE-AR} addresses sequential generation by normalizing codes and injecting Gaussian noise during autoregressive training \citep{yu2026raear}. Here exposure bias has its sequence-model meaning: training sees ground-truth previous codes, whereas generation conditions on its own imperfect samples. This differs from poor reconstruction on clean features and from geometric path mismatch, even though all three can produce off-manifold decoder inputs.
@@ -385,6 +497,13 @@ Robustness & drifted-latent recon, Jacobian gain & \(D(E(x))\) is in-distributio
 \label{tab:criteria}
 \end{table*}
 
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.92\textwidth]{figures/excalidraw-originals/good_latent_space.png}
+  \caption{Earlier intuitions about a ``good latent space'' expressed as four design motifs: smooth prior geometry, equivariant or perturbation-stable codes, computational compression, and semantic alignment. The six-property framework in Table~\ref{tab:criteria} extends this picture by separating rate, modelability, geometry, and decoder robustness. Author-created Excalidraw composition; small panels adapted from the cited source works remain copyright of their original authors and publishers and are excluded from this paper's CC BY license.}
+  \label{fig:good-latent-space}
+\end{figure}
+
 \section{Native and Self-Supervised Generative Representations}
 \label{sec:native}
 
@@ -438,6 +557,31 @@ Black Forest Labs states that \method{FLUX.3} builds on Self-Flow and uses a sha
 Structural domains sharpen the interface problem because validity is geometric. Rotations and translations should not change identity; atom order may be arbitrary; chirality matters; structures vary in size; and a small local coordinate error can propagate globally. A semantic image feature can discard texture harmlessly, whereas a protein code that discards stereochemistry is chemically wrong.
 
 \method{UNITE} reports the same shared tokenization/denoising mechanism on QM9 molecules and MP20 crystals as well as images \citep{duggal2026unite}. \method{Kanzi} uses a flow-matching decoder as a compact protein-structure tokenizer and reports strong reconstruction with a much smaller model than specialized geometric tokenizers \citep{dilip2026kanzi}. \method{OneWorld} builds a 3D unified representation autoencoder from pretrained 3D features, adds cross-view consistency, and trains on both clean and drifted representations \citep{gao2026oneworld}. These examples support the transfer of \emph{principles}---rate, geometry, and decoder robustness---not the literal reuse of image architectures.
+
+Atomistic foundation models provide a second bridge. MACE embeddings transfer from energy/force pretraining to molecular and protein property prediction \citep{batatia2025mace,wedig2025rem3di,bojan2025protein}. As in language and vision, a local feature field must be aggregated into a task-level representation. The generative use cases are more tentative: representation alignment has been explored for force prediction and conformation generation \citep{pinede2025macerepa}, while direct conditioning on atomistic embeddings has not uniformly improved structure prediction \citep{corley2025atomworks}. This distinction between transferable features, aligned generators, and architectural inspiration prevents a downstream probe result from being overread as a generative result.
+
+\begin{figure}[htbp]
+  \centering
+  \begin{subfigure}[t]{0.49\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/excalidraw-originals/molecular_embeddings.png}
+    \caption{Local MACE descriptors are aggregated into molecular representations for property prediction.}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.46\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/excalidraw-originals/rem3di_protein_embeddings.png}
+    \caption{The same local-to-global pattern across NLP, vision, molecules, and proteins.}
+  \end{subfigure}
+
+  \vspace{0.8em}
+  \begin{subfigure}{0.64\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/excalidraw-originals/how_to_use_afms.png}
+    \caption{Three roles for atomistic foundation models: pretrained embeddings, alignment targets, and architectural inspiration.}
+  \end{subfigure}
+  \caption{How the visual representation--generation taxonomy transfers to atomistic systems \citep{batatia2025mace,wedig2025rem3di,bojan2025protein,pinede2025macerepa}. Author-created Excalidraw compositions. Embedded molecular and protein renderings or small source-paper panels remain copyright of their original authors and publishers and are excluded from this paper's CC BY license.}
+  \label{fig:molecular-transfer}
+\end{figure}
 
 Protein modeling also clarifies the difference between representation recurrence and generative self-conditioning. AlphaFold recycling repeatedly feeds predicted structure-derived features back through the network to refine one prediction \citep{jumper2021alphafold}; ESMFold uses a related folding trunk around language-model features \citep{lin2023esmfold}. RFdiffusion uses diffusion self-conditioning in structure generation \citep{watson2023rfdiffusion}. The generic diffusion technique predates RFdiffusion: Analog Bits explicitly introduced self-conditioning of a model's previous clean-data estimate for discrete diffusion \citep{chen2023selfcondition}. Recycling, self-conditioning, and iterative decoding all feed predictions forward, but differ in state, objective, and stochastic semantics. Appendix~\ref{app:recurrence} makes the distinction precise.
 
@@ -503,7 +647,7 @@ The field is converging on a simple but demanding idea: a generative latent is a
 The practical rule is to inspect three objects together: the information carried by \(z\), the errors made by the prior, and the decoder's response to those errors. Then trace every gradient. This view explains why reconstruction, semantics, spectrum, geometry, and rate can each matter without any one becoming the universal answer. It also scales beyond images: the constraints change, but the interface-design problem remains.
 
 \paragraph{Author's note.}
-This article represents the author's personal scholarly synthesis and does not necessarily reflect the views of NVIDIA. Original text and figures are released under CC BY 4.0. No third-party paper figures are reproduced.
+This article represents the author's personal scholarly synthesis and does not necessarily reflect the views of NVIDIA. Original text and author-created diagram layers are released under CC BY 4.0. Small source-paper panels and scientific renderings retained inside explicitly credited teaching composites remain the property of their original authors or publishers and are excluded from that license.
 
 \bibliographystyle{plainnat}
 \bibliography{references}

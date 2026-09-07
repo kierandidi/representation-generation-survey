@@ -2,10 +2,9 @@
 
 - Primary category: `cs.LG`
 - Cross-list: `cs.CV`
-- License: CC BY 4.0
+- License: CC BY 4.0 for the author's original material; see `NOTICE.md` for embedded third-party elements
 - Compiler: pdfLaTeX
 - Entry point: `main.tex`
 - Source bundle: `dist/representation-generation-survey-arxiv.tar.gz`
 
 Before submission, replace the repository-only citation metadata with the assigned arXiv identifier, check that the title and author metadata match the submission form, and rebuild the bundle.
-

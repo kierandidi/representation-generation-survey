@@ -19,7 +19,15 @@ Outputs:
 - `paper.pdf`: compiled manuscript
 - `dist/representation-generation-survey-arxiv.tar.gz`: upload-ready source bundle
 
-A TeX Live installation with `latexmk` is required. The two overview figures are original CC BY 4.0 works; no figures from reviewed papers are redistributed.
+A TeX Live installation with `latexmk` is required. The manuscript deliberately retains the visual essay structure of the companion post: all 18 author-created Excalidraw teaching diagrams are included alongside two new overview figures.
+
+## Figures
+
+- `figures/excalidraw-originals/` contains the diagrams used in the original article.
+- `figures/editable/` contains native Excalidraw source scenes for the new taxonomy and gradient-routing figures. Open them directly at <https://excalidraw.com/>.
+- `figures/README.md` documents the visual grammar and detailed storyboards for the next latent-contract, recurrence, and cross-domain diagrams.
+
+The main paper captions distinguish fully original diagrams from teaching composites that contain small adapted source-paper panels or scientific renderings.
 
 ## Scope and evidence
 
@@ -31,5 +39,4 @@ The shorter living article is available at <https://kdidi.netlify.app/blog/ml/20
 
 ## License
 
-The manuscript text, bibliography, and original figures are licensed under [CC BY 4.0](LICENSE). The bundled `neurips_2026.sty` and `checklist.tex` originate from the NeurIPS 2026 author kit and remain subject to their upstream terms.
-
+The manuscript text, bibliography, and original diagram layers are licensed under [CC BY 4.0](LICENSE). Embedded third-party panels or renderings in explicitly credited composites remain under their source owners' terms and are excluded from that license; see [NOTICE.md](NOTICE.md). The bundled `neurips_2026.sty` and `checklist.tex` originate from the NeurIPS 2026 author kit and remain subject to their upstream terms.
